@@ -9,7 +9,7 @@
 
   <groupId>org.apache.parquet</groupId>
   <artifactId>parquet</artifactId>
-  <version>1.9.0</version>
+  <version>kylin-1.9.0-r1-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Apache Parquet MR</name>
@@ -469,13 +469,6 @@
           </plugin>
         </plugins>
       </reporting>
-      <distributionManagement>
-        <site>
-          <id>github-pages-site</id>
-          <name>Deployment through GitHub's site deployment plugin</name>
-          <url>site/${project.version}</url>
-        </site>
-      </distributionManagement>
       <build>
         <plugins>
           <plugin>
@@ -531,4 +524,19 @@
       </properties>
     </profile>
   </profiles>
+
+
+  <distributionManagement>
+    <snapshotRepository>
+      <id>user-snapshots</id>
+      <name>User Project SNAPSHOTS</name>
+      <url>http://repository.kyligence.io:8081/repository/maven-snapshots/</url>
+    </snapshotRepository>
+    <repository>
+      <id>user-releases</id>
+      <name>User Project Release</name>
+      <url>http://repository.kyligence.io:8081/repository/maven-releases/</url>
+    </repository>
+  </distributionManagement>
+  
 </project>

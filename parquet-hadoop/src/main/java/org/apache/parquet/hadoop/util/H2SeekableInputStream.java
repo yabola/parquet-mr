@@ -84,6 +84,11 @@ class H2SeekableInputStream extends SeekableInputStream {
     readFully(reader, buf);
   }
 
+  @Override
+  public void close() throws IOException {
+    stream.close();
+  }
+
   private class H2Reader implements Reader {
     @Override
     public int read(ByteBuffer buf) throws IOException {
