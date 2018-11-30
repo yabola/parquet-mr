@@ -102,6 +102,7 @@ import org.apache.yetus.audience.InterfaceAudience.Private;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Internal implementation of the Parquet file reader as a block container
  */
@@ -648,19 +649,47 @@ public class ParquetFileReader implements Closeable {
   public ParquetFileReader(
       Configuration configuration, FileMetaData fileMetaData,
       Path filePath, List<BlockMetaData> blocks, List<ColumnDescriptor> columns) throws IOException {
+    List<ColumnIndexStore> blockIndexStores1;
     this.converter = new ParquetMetadataConverter(configuration);
     this.file = HadoopInputFile.fromPath(filePath, configuration);
     this.fileMetaData = fileMetaData;
     this.f = file.newStream();
     this.options = HadoopReadOptions.builder(configuration).build();
     this.blocks = filterRowGroups(blocks);
-    this.blockIndexStores = listWithNulls(this.blocks.size());
     this.blockRowRanges = listWithNulls(this.blocks.size());
+    blockIndexStores1 = listWithNulls(this.blocks.size());
+
     for (ColumnDescriptor col : columns) {
       paths.put(ColumnPath.get(col.getPath()), col);
     }
+    if (options.useColumnIndexFilter()) {
+      blockIndexStores1 = initColumnIndex();
+    }
+    this.blockIndexStores = blockIndexStores1;
+
   }
 
+  private List<ColumnIndexStore> initColumnIndex() throws IOException {
+    List<ColumnIndexStore> blockIndexStores = new ArrayList<>(this.blocks.size());
+    long start = System.currentTimeMillis();
+    long o = f.getPos();
+    for (BlockMetaData block : this.blocks) {
+      blockIndexStores.add(ColumnIndexStoreImpl.create(this, block, paths.keySet()));
+    }
+    for (ColumnIndexStore blockIndexStore : blockIndexStores) {
+      for (ColumnChunkMetaData chunkMetaData : this.blocks.get(0).getColumns()) {
+        blockIndexStore.getColumnIndex(chunkMetaData.getPath());
+      }
+    }
+    f.seek(o);
+    LOG.info("Reset offset:" + o);
+    LOG.info("GetColumnIndexStore time: " + (System.currentTimeMillis() - start));
+    return blockIndexStores;
+  }
+
+  public boolean useColumnIndexFilter() {
+    return this.options.useColumnIndexFilter();
+  }
   /**
    * @param conf the Hadoop Configuration
    * @param file Path to a parquet file
@@ -698,6 +727,7 @@ public class ParquetFileReader implements Closeable {
   }
 
   public ParquetFileReader(InputFile file, ParquetReadOptions options) throws IOException {
+    List<ColumnIndexStore> blockIndexStores1;
     this.converter = new ParquetMetadataConverter(options);
     this.file = file;
     this.f = file.newStream();
@@ -712,11 +742,15 @@ public class ParquetFileReader implements Closeable {
     }
     this.fileMetaData = footer.getFileMetaData();
     this.blocks = filterRowGroups(footer.getBlocks());
-    this.blockIndexStores = listWithNulls(this.blocks.size());
+    blockIndexStores1 = listWithNulls(this.blocks.size());
     this.blockRowRanges = listWithNulls(this.blocks.size());
     for (ColumnDescriptor col : footer.getFileMetaData().getSchema().getColumns()) {
       paths.put(ColumnPath.get(col.getPath()), col);
     }
+    if (useColumnIndexFilter()) {
+      blockIndexStores1 = initColumnIndex();
+    }
+    this.blockIndexStores = blockIndexStores1;
   }
 
   private static <T> List<T> listWithNulls(int size) {
@@ -870,17 +904,21 @@ public class ParquetFileReader implements Closeable {
    *           if any I/O error occurs while reading
    */
   public PageReadStore readNextFilteredRowGroup() throws IOException {
+    long start = System.currentTimeMillis();
     if (currentBlock == blocks.size()) {
       return null;
     }
-    if (!options.useColumnIndexFilter()) {
-      return readNextRowGroup();
+    if (!useColumnIndexFilter()) {
+      PageReadStore pageReadStore = readNextRowGroup();
+      LOG.info("Read row group time: " + (System.currentTimeMillis() - start));
+      return pageReadStore;
     }
     BlockMetaData block = blocks.get(currentBlock);
     if (block.getRowCount() == 0) {
       throw new RuntimeException("Illegal row group of 0 rows");
     }
     ColumnIndexStore ciStore = getColumnIndexStore(currentBlock);
+    LOG.info("Filter time: " + (System.currentTimeMillis() - start));
     RowRanges rowRanges = getRowRanges(currentBlock);
     long rowCount = rowRanges.rowCount();
     if (rowCount == 0) {
@@ -935,6 +973,7 @@ public class ParquetFileReader implements Closeable {
     }
 
     advanceToNextBlock();
+    LOG.info("Read row group time: " + (System.currentTimeMillis() - start));
 
     return currentRowGroup;
   }
