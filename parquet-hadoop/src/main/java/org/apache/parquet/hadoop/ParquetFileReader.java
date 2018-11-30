@@ -650,17 +650,42 @@ public class ParquetFileReader implements Closeable {
   public ParquetFileReader(
       Configuration configuration, FileMetaData fileMetaData,
       Path filePath, List<BlockMetaData> blocks, List<ColumnDescriptor> columns) throws IOException {
+    List<ColumnIndexStore> blockIndexStores1;
     this.converter = new ParquetMetadataConverter(configuration);
     this.file = HadoopInputFile.fromPath(filePath, configuration);
     this.fileMetaData = fileMetaData;
     this.f = file.newStream();
     this.options = HadoopReadOptions.builder(configuration).build();
     this.blocks = filterRowGroups(blocks);
-    this.blockIndexStores = listWithNulls(this.blocks.size());
     this.blockRowRanges = listWithNulls(this.blocks.size());
+    blockIndexStores1 = listWithNulls(this.blocks.size());
+
     for (ColumnDescriptor col : columns) {
       paths.put(ColumnPath.get(col.getPath()), col);
     }
+    if (options.useColumnIndexFilter()) {
+      blockIndexStores1 = initColumnIndex(blocks);
+    }
+    this.blockIndexStores = blockIndexStores1;
+
+  }
+
+  private List<ColumnIndexStore> initColumnIndex(List<BlockMetaData> blocks) throws IOException {
+    List<ColumnIndexStore> blockIndexStores = new ArrayList<>(this.blocks.size());
+    long start = System.currentTimeMillis();
+    long o = f.getPos();
+    for (BlockMetaData block : this.blocks) {
+      blockIndexStores.add(ColumnIndexStoreImpl.create(this, block, paths.keySet()));
+    }
+    for (ColumnIndexStore blockIndexStore : blockIndexStores) {
+      for (ColumnChunkMetaData chunkMetaData : blocks.get(0).getColumns()) {
+        blockIndexStore.getColumnIndex(chunkMetaData.getPath());
+      }
+    }
+    f.seek(o);
+    LOG.info("reset offset:" + o);
+    LOG.info("getColumnIndexStore(when initing) time: " + (System.currentTimeMillis() - start));
+    return blockIndexStores;
   }
 
   /**
