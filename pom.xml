@@ -9,7 +9,7 @@
 
   <groupId>org.apache.parquet</groupId>
   <artifactId>parquet</artifactId>
-  <version>1.12.0-SNAPSHOT</version>
+  <version>1.12.0-kylin-r1</version>
   <packaging>pom</packaging>
 
   <name>Apache Parquet MR</name>
@@ -156,7 +156,18 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
+  <distributionManagement>
+    <snapshotRepository>
+      <id>user-snapshots</id>
+      <name>User Project SNAPSHOTS</name>
+      <url>http://repository.kyligence.io:8081/repository/maven-snapshots/</url>
+    </snapshotRepository>
+    <repository>
+      <id>user-releases</id>
+      <name>User Project Release</name>
+      <url>http://repository.kyligence.io:8081/repository/maven-releases/</url>
+    </repository>
+  </distributionManagement>
   <reporting>
     <plugins>
       <plugin>
