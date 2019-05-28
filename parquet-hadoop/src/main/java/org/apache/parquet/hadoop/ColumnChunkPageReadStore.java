@@ -35,6 +35,7 @@ import org.apache.parquet.column.page.DictionaryPageReadStore;
 import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.column.page.PageReader;
 import org.apache.parquet.compression.CompressionCodecFactory.BytesInputDecompressor;
+import org.apache.parquet.format.ParquetMetrics;
 import org.apache.parquet.internal.column.columnindex.OffsetIndex;
 import org.apache.parquet.internal.filter2.columnindex.RowRanges;
 import org.apache.parquet.io.ParquetDecodingException;
@@ -98,7 +99,9 @@ class ColumnChunkPageReadStore implements PageReadStore, DictionaryPageReadStore
         @Override
         public DataPage visit(DataPageV1 dataPageV1) {
           try {
+            ParquetMetrics.get().pageReadDecompressStart();
             BytesInput decompressed = decompressor.decompress(dataPageV1.getBytes(), dataPageV1.getUncompressedSize());
+            ParquetMetrics.get().pageReadDecompressEnd(dataPageV1.getUncompressedSize(), dataPageV1.getBytes().size());
             if (offsetIndex == null) {
               return new DataPageV1(
                   decompressed,
@@ -149,7 +152,9 @@ class ColumnChunkPageReadStore implements PageReadStore, DictionaryPageReadStore
                 dataPageV2.getUncompressedSize()
                     - dataPageV2.getDefinitionLevels().size()
                     - dataPageV2.getRepetitionLevels().size());
+            ParquetMetrics.get().pageReadDecompressStart();
             BytesInput decompressed = decompressor.decompress(dataPageV2.getData(), uncompressedSize);
+            ParquetMetrics.get().pageReadDecompressEnd(uncompressedSize, dataPageV2.getData().size());
             if (offsetIndex == null) {
               return DataPageV2.uncompressed(
                   dataPageV2.getRowCount(),

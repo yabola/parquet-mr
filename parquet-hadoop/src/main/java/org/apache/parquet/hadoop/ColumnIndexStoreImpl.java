@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.parquet.format.ParquetMetrics;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnPath;
@@ -145,11 +146,17 @@ class ColumnIndexStoreImpl implements ColumnIndexStore {
 
   @Override
   public ColumnIndex getColumnIndex(ColumnPath column) {
-    return store.getOrDefault(column, MISSING_INDEX_STORE).getColumnIndex();
+    ParquetMetrics.get().columnIndexReadStart();
+    ColumnIndex columnIndex = this.store.getOrDefault(column, MISSING_INDEX_STORE).getColumnIndex();
+    ParquetMetrics.get().columnIndexReadEnd();
+    return columnIndex;
   }
 
   @Override
   public OffsetIndex getOffsetIndex(ColumnPath column) {
-    return store.getOrDefault(column, MISSING_INDEX_STORE).getOffsetIndex();
+    ParquetMetrics.get().offsetIndexReadStart();
+    OffsetIndex offsetIndex = this.store.getOrDefault(column, MISSING_INDEX_STORE).getOffsetIndex();
+    ParquetMetrics.get().offsetIndexReadEnd();
+    return offsetIndex;
   }
 }

@@ -43,6 +43,7 @@ import org.apache.parquet.column.page.PageReader;
 import org.apache.parquet.column.values.RequiresPreviousReader;
 import org.apache.parquet.column.values.ValuesReader;
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridDecoder;
+import org.apache.parquet.format.ParquetMetrics;
 import org.apache.parquet.io.ParquetDecodingException;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.io.api.PrimitiveConverter;
@@ -585,6 +586,7 @@ abstract class ColumnReaderBase implements ColumnReader {
   abstract boolean skipRL(int rl);
 
   private void readPage() {
+    ParquetMetrics.get().pageReadStart();
     LOG.debug("loading page");
     DataPage page = pageReader.readPage();
     page.accept(new DataPage.Visitor<Void>() {
@@ -599,6 +601,7 @@ abstract class ColumnReaderBase implements ColumnReader {
         return null;
       }
     });
+    ParquetMetrics.get().pageReadEnd();
   }
 
   private void initDataReader(Encoding dataEncoding, ByteBufferInputStream in, int valueCount) {

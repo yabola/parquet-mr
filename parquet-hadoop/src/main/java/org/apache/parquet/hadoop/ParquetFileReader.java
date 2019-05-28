@@ -74,6 +74,7 @@ import org.apache.parquet.format.DataPageHeader;
 import org.apache.parquet.format.DataPageHeaderV2;
 import org.apache.parquet.format.DictionaryPageHeader;
 import org.apache.parquet.format.PageHeader;
+import org.apache.parquet.format.ParquetMetrics;
 import org.apache.parquet.format.Util;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.format.converter.ParquetMetadataConverter.MetadataFilter;
@@ -517,6 +518,7 @@ public class ParquetFileReader implements Closeable {
   }
 
   private static final ParquetMetadata readFooter(InputFile file, ParquetReadOptions options, SeekableInputStream f, ParquetMetadataConverter converter) throws IOException {
+    ParquetMetrics.get().footerReadStart();
     long fileLen = file.getLength();
     String filePath = file.toString();
     LOG.debug("File length {}", fileLen);
@@ -540,7 +542,9 @@ public class ParquetFileReader implements Closeable {
       throw new RuntimeException("corrupted file: the footer index is not within the file: " + footerIndex);
     }
     f.seek(footerIndex);
-    return converter.readParquetMetadata(f, options.getMetadataFilter());
+    ParquetMetadata parquetMetadata = converter.readParquetMetadata(f, options.getMetadataFilter());
+    ParquetMetrics.get().footerReadEnd();
+    return parquetMetadata;
   }
 
   /**
@@ -849,6 +853,7 @@ public class ParquetFileReader implements Closeable {
    * @return the PageReadStore which can provide PageReaders for each column.
    */
   public PageReadStore readNextRowGroup() throws IOException {
+    ParquetMetrics.get().groupReadStart();
     if (currentBlock == blocks.size()) {
       return null;
     }
@@ -889,7 +894,7 @@ public class ParquetFileReader implements Closeable {
     }
 
     advanceToNextBlock();
-
+    ParquetMetrics.get().groupReadEnd();
     return currentRowGroup;
   }
 
@@ -904,6 +909,7 @@ public class ParquetFileReader implements Closeable {
    *           if any I/O error occurs while reading
    */
   public PageReadStore readNextFilteredRowGroup() throws IOException {
+    ParquetMetrics.get().filteredGroupReadStart();
     long start = System.currentTimeMillis();
     if (currentBlock == blocks.size()) {
       return null;
@@ -941,7 +947,7 @@ public class ParquetFileReader implements Closeable {
       ColumnDescriptor columnDescriptor = paths.get(pathKey);
       if (columnDescriptor != null) {
         OffsetIndex offsetIndex = ciStore.getOffsetIndex(mc.getPath());
-
+        ParquetMetrics.get().accumulateTotalPages(offsetIndex.getPageCount());
         OffsetIndex filteredOffsetIndex = filterOffsetIndex(offsetIndex, rowRanges,
             block.getRowCount());
         for (OffsetRange range : calculateOffsetRanges(filteredOffsetIndex, mc, offsetIndex.getOffset(0))) {
@@ -975,6 +981,7 @@ public class ParquetFileReader implements Closeable {
     advanceToNextBlock();
     LOG.info("Read row group time: " + (System.currentTimeMillis() - start));
 
+    ParquetMetrics.get().filteredGroupReadEnd();
     return currentRowGroup;
   }
 
@@ -1122,6 +1129,8 @@ public class ParquetFileReader implements Closeable {
       if (f != null) {
         f.close();
       }
+      LOG.info(ParquetMetrics.get().summary());
+      ParquetMetrics.get().reset();
     } finally {
       options.getCodecFactory().release();
     }

@@ -75,7 +75,10 @@ public class Util {
   }
 
   public static PageHeader readPageHeader(InputStream from) throws IOException {
-    return read(from, new PageHeader());
+    ParquetMetrics.get().pageReadHeaderStart();
+    PageHeader read = read(from, new PageHeader());
+    ParquetMetrics.get().pageReadHeaderEnd();
+    return read;
   }
 
   public static void writeFileMetaData(org.apache.parquet.format.FileMetaData fileMetadata, OutputStream to) throws IOException {
