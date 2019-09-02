@@ -75,14 +75,14 @@ class InternalParquetRecordWriter<T> {
    * @param compressor the codec used to compress
    */
   public InternalParquetRecordWriter(
-      ParquetFileWriter parquetFileWriter,
-      WriteSupport<T> writeSupport,
-      MessageType schema,
-      Map<String, String> extraMetaData,
-      long rowGroupSize,
-      BytesCompressor compressor,
-      boolean validating,
-      ParquetProperties props) {
+    ParquetFileWriter parquetFileWriter,
+    WriteSupport<T> writeSupport,
+    MessageType schema,
+    Map<String, String> extraMetaData,
+    long rowGroupSize,
+    BytesCompressor compressor,
+    boolean validating,
+    ParquetProperties props) {
     this.parquetFileWriter = parquetFileWriter;
     this.writeSupport = checkNotNull(writeSupport, "writeSupport");
     this.schema = schema;
@@ -102,7 +102,7 @@ class InternalParquetRecordWriter<T> {
 
   private void initStore() {
     pageStore = new ColumnChunkPageWriteStore(compressor, schema, props.getAllocator(),
-        props.getColumnIndexTruncateLength());
+      props.getColumnIndexTruncateLength());
     columnStore = props.newColumnWriteStore(schema, pageStore);
     MessageColumnIO columnIO = new ColumnIOFactory(validating).getColumnIO(schema);
     this.recordConsumer = columnIO.getRecordWriter(columnStore);
@@ -138,7 +138,8 @@ class InternalParquetRecordWriter<T> {
   }
 
   private void checkBlockSizeReached() throws IOException {
-    if (recordCount >= recordCountForNextMemCheck) { // checking the memory size is relatively expensive, so let's not do it for every record.
+    if (recordCount >= recordCountForNextMemCheck || writeSupport.needCheckRowSize) { // checking the memory size is relatively expensive, so let's not do it for every record.
+      writeSupport.needCheckRowSize = false;
       long memSize = columnStore.getBufferedSize();
       long recordSize = memSize / recordCount;
       // flush the row group if it is within ~2 records of the limit
@@ -151,16 +152,16 @@ class InternalParquetRecordWriter<T> {
         this.lastRowGroupEndPos = parquetFileWriter.getPos();
       } else {
         recordCountForNextMemCheck = min(
-            max(MINIMUM_RECORD_COUNT_FOR_CHECK, (recordCount + (long)(nextRowGroupSize / ((float)recordSize))) / 2), // will check halfway
-            recordCount + MAXIMUM_RECORD_COUNT_FOR_CHECK // will not look more than max records ahead
-            );
+          max(MINIMUM_RECORD_COUNT_FOR_CHECK, (recordCount + (long)(nextRowGroupSize / ((float)recordSize))) / 2), // will check halfway
+          recordCount + MAXIMUM_RECORD_COUNT_FOR_CHECK // will not look more than max records ahead
+        );
         LOG.debug("Checked mem at {} will check again at: {}", recordCount, recordCountForNextMemCheck);
       }
     }
   }
 
   private void flushRowGroupToStore()
-      throws IOException {
+    throws IOException {
     recordConsumer.flush();
     LOG.debug("Flushing mem columnStore to file. allocated memory: {}", columnStore.getAllocatedSize());
     if (columnStore.getAllocatedSize() > (3 * rowGroupSizeThreshold)) {
@@ -174,8 +175,8 @@ class InternalParquetRecordWriter<T> {
       recordCount = 0;
       parquetFileWriter.endBlock();
       this.nextRowGroupSize = Math.min(
-          parquetFileWriter.getNextRowGroupSize(),
-          rowGroupSizeThreshold);
+        parquetFileWriter.getNextRowGroupSize(),
+        rowGroupSizeThreshold);
     }
 
     columnStore = null;
