@@ -36,11 +36,13 @@ import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.column.page.PageReader;
 import org.apache.parquet.compression.CompressionCodecFactory.BytesInputDecompressor;
 import org.apache.parquet.format.ParquetMetrics;
+import org.apache.parquet.hadoop.codec.SnappyCodec;
 import org.apache.parquet.internal.column.columnindex.OffsetIndex;
 import org.apache.parquet.internal.filter2.columnindex.RowRanges;
 import org.apache.parquet.io.ParquetDecodingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xerial.snappy.Snappy;
 
 /**
  * TODO: should this actually be called RowGroupImpl or something?
@@ -100,11 +102,19 @@ class ColumnChunkPageReadStore implements PageReadStore, DictionaryPageReadStore
         public DataPage visit(DataPageV1 dataPageV1) {
           try {
             ParquetMetrics.get().pageReadDecompressStart();
-            BytesInput decompressed = decompressor.decompress(dataPageV1.getBytes(), dataPageV1.getUncompressedSize());
+            BytesInput decompressed;
+            if (decompressor instanceof CodecFactory.HeapBytesDecompressor &&(((CodecFactory.HeapBytesDecompressor) decompressor).codec instanceof SnappyCodec)) {
+              byte[] bytes = dataPageV1.getBytes().toByteArray();
+              byte[] decompressedBytes = new byte[dataPageV1.getUncompressedSize()];
+              Snappy.uncompress(bytes, 0, bytes.length, decompressedBytes, 0);
+              decompressed = BytesInput.from(decompressedBytes);
+            } else {
+              decompressed = decompressor.decompress(dataPageV1.getBytes(), dataPageV1.getUncompressedSize());
+            }
             ParquetMetrics.get().pageReadDecompressEnd(dataPageV1.getUncompressedSize(), dataPageV1.getBytes().size());
             if (offsetIndex == null) {
               return new DataPageV1(
-                  decompressed,
+                      decompressed,
                   dataPageV1.getValueCount(),
                   dataPageV1.getUncompressedSize(),
                   dataPageV1.getStatistics(),
