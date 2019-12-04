@@ -201,7 +201,12 @@ public class ParquetMetrics {
     metric.put("offsetPageIndexReadTime", offsetPageIndexReadTime / 1000000);
     metric.put("offsetPageIndexReadCnt", offsetPageIndexReadCnt);
 
-    metric.put("totalTime", (
+    metric.put("totalTime", getTotalTime());
+    return metric;
+  }
+
+  public long getTotalTime() {
+    return (
       pageReadHeaderTime +
         footerReadTime +
         groupReadTime +
@@ -209,9 +214,78 @@ public class ParquetMetrics {
         filteredGroupReadTime +
         pageReadDecompressTime +
         colPageIndexReadTime +
-        offsetPageIndexReadTime) / 1000000);
-    return metric;
+        offsetPageIndexReadTime) / 1000000;
   }
 
+  public long getPageReadHeaderTime() {
+    return pageReadHeaderTime / 1000000;
+  }
 
+  public long getPageReadHeaderCnt() {
+    return pageReadHeaderCnt;
+  }
+
+  public long getFooterReadTime() {
+    return footerReadTime / 1000000;
+  }
+
+  public long getFooterReadCnt() {
+    return footerReadCnt;
+  }
+
+  public long getGroupReadTime() {
+    return groupReadTime / 1000000;
+  }
+
+  public long getGroupReadCnt() {
+    return groupReadCnt;
+  }
+
+  public long getPageReadTime() {
+    return pageReadTime / 1000000;
+  }
+
+  public long getPageReadCnt() {
+    return pageReadCnt;
+  }
+
+  public long getFilteredGroupReadTime() {
+    return filteredGroupReadTime / 1000000;
+  }
+
+  public long getFilteredGroupReadCnt() {
+    return filteredGroupReadCnt;
+  }
+
+  public long getPageReadUncompressBytes() {
+    return pageReadUncompressBytes;
+  }
+
+  public long getPageReadDecompressBytes() {
+    return pageReadDecompressBytes;
+  }
+
+  public long getPageReadDecompressTime() {
+    return pageReadDecompressTime / 1000000;
+  }
+
+  public long getTotalPages() {
+    return totalPages;
+  }
+
+  public long getColPageIndexReadCnt() {
+    return colPageIndexReadCnt;
+  }
+
+  public long getColPageIndexReadTime() {
+    return colPageIndexReadTime / 1000000;
+  }
+
+  public long getOffsetPageIndexReadCnt() {
+    return offsetPageIndexReadCnt;
+  }
+
+  public long getOffsetPageIndexReadTime() {
+    return offsetPageIndexReadTime / 1000000;
+  }
 }
