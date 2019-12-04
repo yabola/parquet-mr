@@ -168,6 +168,19 @@ public class ParquetMetrics {
     return sb.toString();
   }
 
+  @Override
+  public String toString() {
+    Map<String, Long> metric = getMetric();
+    StringBuilder sb = new StringBuilder();
+    for (String k : metric.keySet()) {
+      Long v = metric.get(k);
+      if (v != 0) {
+        sb.append(k).append("\t").append(v).append("| ");
+      }
+    }
+    return sb.toString();
+  }
+
   public Map<String, Long> getMetric() {
     Map<String, Long> metric = new LinkedHashMap<>();
     // common
