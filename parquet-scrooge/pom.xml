@@ -21,7 +21,7 @@
     <groupId>org.apache.parquet</groupId>
     <artifactId>parquet</artifactId>
     <relativePath>../pom.xml</relativePath>
-    <version>kylin-1.9.0-r1-SNAPSHOT</version>
+    <version>kylin-1.9.0-r1</version>
   </parent>
 
   <modelVersion>4.0.0</modelVersion>
@@ -128,9 +128,7 @@
 
   <build>
     <plugins>
-      <plugin>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
