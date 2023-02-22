@@ -43,10 +43,14 @@ import org.slf4j.LoggerFactory;
  * no filtering will be performed.
  */
 public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
+
+  public static Logger LOGGER = LoggerFactory.getLogger(RowGroupFilter.class);
+
   private final List<BlockMetaData> blocks;
   private final MessageType schema;
   private final List<FilterLevel> levels;
   private final ParquetFileReader reader;
+  private KylinQueryInfo kylinQueryInfo = new KylinQueryInfo();
 
   public enum FilterLevel {
     STATISTICS,
@@ -72,6 +76,12 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
     return filter.accept(new RowGroupFilter(levels, blocks, reader));
   }
 
+  public static List<BlockMetaData> filterRowGroups(List<FilterLevel> levels, Filter filter, List<BlockMetaData> blocks,
+    ParquetFileReader reader, KylinQueryInfo kylinQueryInfo) {
+    Objects.requireNonNull(filter, "filter cannot be null");
+    return filter.accept(new RowGroupFilter(levels, blocks, reader, kylinQueryInfo));
+  }
+
   @Deprecated
   private RowGroupFilter(List<BlockMetaData> blocks, MessageType schema) {
     this.blocks = Objects.requireNonNull(blocks, "blocks cannnot be null");
@@ -87,6 +97,15 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
     this.levels = levels;
   }
 
+  private RowGroupFilter(List<FilterLevel> levels, List<BlockMetaData> blocks, ParquetFileReader reader,
+    KylinQueryInfo kylinQueryInfo) {
+    this.blocks = Objects.requireNonNull(blocks, "blocks cannnot be null");
+    this.reader = Objects.requireNonNull(reader, "reader cannnot be null");
+    this.schema = reader.getFileMetaData().getSchema();
+    this.levels = levels;
+    this.kylinQueryInfo = kylinQueryInfo;
+  }
+
   @Override
   public List<BlockMetaData> visit(FilterCompat.FilterPredicateCompat filterPredicateCompat) {
     FilterPredicate filterPredicate = filterPredicateCompat.getFilterPredicate();
@@ -95,7 +114,7 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
     SchemaCompatibilityValidator.validate(filterPredicate, schema);
 
     List<BlockMetaData> filteredBlocks = new ArrayList<BlockMetaData>();
-
+    long start = System.currentTimeMillis();
     for (BlockMetaData block : blocks) {
       boolean drop = false;
 
@@ -109,13 +128,22 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
 
       if (!drop && levels.contains(FilterLevel.BLOOMFILTER)) {
         drop = BloomFilterImpl.canDrop(filterPredicate, block.getColumns(), reader.getBloomFilterDataReader(block));
+        this.kylinQueryInfo.setTotalBloomBlocks(this.kylinQueryInfo.getTotalBloomBlocks() + 1);
+        if (drop) {
+          this.kylinQueryInfo.setSkipBloomFilter(this.kylinQueryInfo.getSkipBloomFilter() + filterPredicateCompat);
+          this.kylinQueryInfo.setSkipBloomRows(this.kylinQueryInfo.getSkipBloomRows() + block.getRowCount());
+          this.kylinQueryInfo.setSkipBloomBlocks(this.kylinQueryInfo.getSkipBloomBlocks() + 1);
+        }
       }
 
       if(!drop) {
         filteredBlocks.add(block);
       }
     }
-
+    long end = System.currentTimeMillis();
+    if ((end - start) > 100) {
+      LOGGER.warn(" Kylin read RowGroupFilter cost much time : " + (end - start));
+    }
     return filteredBlocks;
   }
 
