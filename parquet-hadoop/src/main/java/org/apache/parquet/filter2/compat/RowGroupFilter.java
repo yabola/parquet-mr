@@ -50,7 +50,7 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
   private final MessageType schema;
   private final List<FilterLevel> levels;
   private final ParquetFileReader reader;
-  private KylinQueryInfo kylinQueryInfo = new KylinQueryInfo();
+  private QueryMetrics queryMetrics = new QueryMetrics();
 
   public enum FilterLevel {
     STATISTICS,
@@ -77,9 +77,9 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
   }
 
   public static List<BlockMetaData> filterRowGroups(List<FilterLevel> levels, Filter filter, List<BlockMetaData> blocks,
-    ParquetFileReader reader, KylinQueryInfo kylinQueryInfo) {
+    ParquetFileReader reader, QueryMetrics queryMetrics) {
     Objects.requireNonNull(filter, "filter cannot be null");
-    return filter.accept(new RowGroupFilter(levels, blocks, reader, kylinQueryInfo));
+    return filter.accept(new RowGroupFilter(levels, blocks, reader, queryMetrics));
   }
 
   @Deprecated
@@ -98,12 +98,12 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
   }
 
   private RowGroupFilter(List<FilterLevel> levels, List<BlockMetaData> blocks, ParquetFileReader reader,
-    KylinQueryInfo kylinQueryInfo) {
+    QueryMetrics queryMetrics) {
     this.blocks = Objects.requireNonNull(blocks, "blocks cannnot be null");
     this.reader = Objects.requireNonNull(reader, "reader cannnot be null");
     this.schema = reader.getFileMetaData().getSchema();
     this.levels = levels;
-    this.kylinQueryInfo = kylinQueryInfo;
+    this.queryMetrics = queryMetrics;
   }
 
   @Override
@@ -128,11 +128,11 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
 
       if (!drop && levels.contains(FilterLevel.BLOOMFILTER)) {
         drop = BloomFilterImpl.canDrop(filterPredicate, block.getColumns(), reader.getBloomFilterDataReader(block));
-        this.kylinQueryInfo.setTotalBloomBlocks(this.kylinQueryInfo.getTotalBloomBlocks() + 1);
+        this.queryMetrics.setTotalBloomBlocks(this.queryMetrics.getTotalBloomBlocks() + 1);
         if (drop) {
-          this.kylinQueryInfo.setSkipBloomFilter(this.kylinQueryInfo.getSkipBloomFilter() + filterPredicateCompat);
-          this.kylinQueryInfo.setSkipBloomRows(this.kylinQueryInfo.getSkipBloomRows() + block.getRowCount());
-          this.kylinQueryInfo.setSkipBloomBlocks(this.kylinQueryInfo.getSkipBloomBlocks() + 1);
+          this.queryMetrics.setSkipBloomFilter(this.queryMetrics.getSkipBloomFilter() + filterPredicateCompat);
+          this.queryMetrics.setSkipBloomRows(this.queryMetrics.getSkipBloomRows() + block.getRowCount());
+          this.queryMetrics.setSkipBloomBlocks(this.queryMetrics.getSkipBloomBlocks() + 1);
         }
       }
 
@@ -142,7 +142,7 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
     }
     long end = System.currentTimeMillis();
     if ((end - start) > 100) {
-      LOGGER.warn(" Kylin read RowGroupFilter cost much time : " + (end - start));
+      LOGGER.warn("Reading RowGroupFilter costs much time : " + (end - start));
     }
     return filteredBlocks;
   }

@@ -82,7 +82,7 @@ import org.apache.parquet.crypto.ModuleCipherFactory.ModuleType;
 import org.apache.parquet.crypto.ParquetCryptoRuntimeException;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.compat.RowGroupFilter;
-import org.apache.parquet.filter2.compat.KylinQueryInfo;
+import org.apache.parquet.filter2.compat.QueryMetrics;
 import org.apache.parquet.format.BlockCipher;
 import org.apache.parquet.format.BloomFilterHeader;
 import org.apache.parquet.format.DataPageHeader;
@@ -131,7 +131,7 @@ public class ParquetFileReader implements Closeable {
 
   private final CRC32 crc;
 
-  public KylinQueryInfo kylinQueryInfo = new KylinQueryInfo();
+  public QueryMetrics queryMetrics = new QueryMetrics();
 
   /**
    * for files provided, check if there's a summary file.
@@ -870,7 +870,7 @@ public class ParquetFileReader implements Closeable {
       if (options.useBloomFilter()) {
         levels.add(BLOOMFILTER);
       }
-      return RowGroupFilter.filterRowGroups(levels, recordFilter, blocks, this, kylinQueryInfo);
+      return RowGroupFilter.filterRowGroups(levels, recordFilter, blocks, this, queryMetrics);
     }
 
     return blocks;

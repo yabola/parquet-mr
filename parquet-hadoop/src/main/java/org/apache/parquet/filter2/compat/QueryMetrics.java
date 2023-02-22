@@ -19,7 +19,7 @@
 
 package org.apache.parquet.filter2.compat;
 
-public class KylinQueryInfo {
+public class QueryMetrics {
   private String skipBloomFilter = "";
   private long skipBloomBlocks = 0;
   private long skipBloomRows = 0;
