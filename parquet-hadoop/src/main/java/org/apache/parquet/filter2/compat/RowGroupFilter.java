@@ -22,6 +22,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.parquet.filter2.bloomfilterlevel.BloomFilterImpl;
 import org.apache.parquet.filter2.compat.FilterCompat.Filter;
@@ -29,13 +33,12 @@ import org.apache.parquet.filter2.compat.FilterCompat.NoOpFilter;
 import org.apache.parquet.filter2.compat.FilterCompat.Visitor;
 import org.apache.parquet.filter2.dictionarylevel.DictionaryFilter;
 import org.apache.parquet.filter2.predicate.FilterPredicate;
+import org.apache.parquet.filter2.predicate.Operators;
 import org.apache.parquet.filter2.predicate.SchemaCompatibilityValidator;
 import org.apache.parquet.filter2.statisticslevel.StatisticsFilter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.schema.MessageType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Given a {@link Filter} applies it to a list of BlockMetaData (row groups)
@@ -127,12 +130,16 @@ public class RowGroupFilter implements Visitor<List<BlockMetaData>> {
       }
 
       if (!drop && levels.contains(FilterLevel.BLOOMFILTER)) {
-        drop = BloomFilterImpl.canDrop(filterPredicate, block.getColumns(), reader.getBloomFilterDataReader(block));
-        this.queryMetrics.setTotalBloomBlocks(this.queryMetrics.getTotalBloomBlocks() + 1);
-        if (drop) {
-          this.queryMetrics.setSkipBloomFilter(this.queryMetrics.getSkipBloomFilter() + filterPredicateCompat);
-          this.queryMetrics.setSkipBloomRows(this.queryMetrics.getSkipBloomRows() + block.getRowCount());
-          this.queryMetrics.setSkipBloomBlocks(this.queryMetrics.getSkipBloomBlocks() + 1);
+        AtomicInteger bloomInfo = new AtomicInteger(0);
+        drop = BloomFilterImpl.canDropWithInfo(filterPredicate, block.getColumns(),
+          reader.getBloomFilterDataReader(block), bloomInfo);
+        if (bloomInfo.get() != 0) {
+          this.queryMetrics.setTotalBloomBlocks(this.queryMetrics.getTotalBloomBlocks() + 1);
+          if (drop) {
+            this.queryMetrics.setSkipBloomFilter(this.queryMetrics.getSkipBloomFilter() + filterPredicateCompat);
+            this.queryMetrics.setSkipBloomRows(this.queryMetrics.getSkipBloomRows() + block.getRowCount());
+            this.queryMetrics.setSkipBloomBlocks(this.queryMetrics.getSkipBloomBlocks() + 1);
+          }
         }
       }
 
